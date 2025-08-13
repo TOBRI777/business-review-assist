@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 interface Review {
@@ -27,16 +26,13 @@ interface Review {
 }
 
 export const useReviews = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchReviews();
-    }
-  }, [user]);
+    fetchReviews();
+  }, []);
 
   const fetchReviews = async () => {
     try {
@@ -87,7 +83,7 @@ export const useReviews = () => {
         .from('review_replies')
         .update({
           status: 'approved',
-          approved_by: user?.id,
+          approved_by: null,
           approved_at: new Date().toISOString(),
         })
         .eq('id', replyId);

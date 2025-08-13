@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 interface UserSettings {
@@ -11,23 +10,19 @@ interface UserSettings {
 }
 
 export const useUserSettings = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchSettings();
-    }
-  }, [user]);
+    fetchSettings();
+  }, []);
 
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
         .from('user_settings')
         .select('*')
-        .eq('user_id', user?.id)
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -52,7 +47,7 @@ export const useUserSettings = () => {
       const { data, error } = await supabase
         .from('user_settings')
         .update(updates)
-        .eq('user_id', user?.id)
+        
         .select()
         .single();
 

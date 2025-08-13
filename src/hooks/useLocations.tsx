@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 interface Location {
@@ -17,16 +16,13 @@ interface Location {
 }
 
 export const useLocations = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      fetchLocations();
-    }
-  }, [user]);
+    fetchLocations();
+  }, []);
 
   const fetchLocations = async () => {
     try {
@@ -39,7 +35,7 @@ export const useLocations = () => {
             custom_tone
           )
         `)
-        .eq('user_id', user?.id)
+        
         .order('name');
 
       if (error) throw error;

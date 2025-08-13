@@ -1,6 +1,4 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import { useLocations } from '@/hooks/useLocations';
 import { useReviews } from '@/hooks/useReviews';
 import { Card } from '@/components/ui/card';
@@ -10,18 +8,11 @@ import { ReviewCard } from '@/components/dashboard/ReviewCard';
 import { Building2, Settings, MessageSquare, Clock, CheckCircle, Star } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user, loading: authLoading } = useAuth();
   const { locations, loading: locationsLoading } = useLocations();
   const { reviews, loading: reviewsLoading, approveReply, rejectReply } = useReviews();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
-
-  if (authLoading || locationsLoading || reviewsLoading) {
+  if (locationsLoading || reviewsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -29,7 +20,7 @@ const Dashboard = () => {
     );
   }
 
-  if (!user) return null;
+  
 
   const activeLocations = locations.filter(loc => loc.is_active);
   const pendingReplies = reviews.filter(review => review.reply?.status === 'pending');
