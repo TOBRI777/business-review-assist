@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useLocations } from '@/hooks/useLocations';
 import { Card } from '@/components/ui/card';
@@ -13,7 +13,6 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Key, MessageSquare, Building2, Eye, EyeOff } from 'lucide-react';
 
 const DashboardSettings = () => {
-  const { user, loading: authLoading } = useAuth();
   const { settings, loading: settingsLoading, updateSettings } = useUserSettings();
   const { locations, updateLocationSettings } = useLocations();
   const navigate = useNavigate();
@@ -25,26 +24,18 @@ const DashboardSettings = () => {
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
-  }, [user, authLoading, navigate]);
-
-  useEffect(() => {
     if (settings) {
       setGlobalTone(settings.global_tone || '');
     }
   }, [settings]);
 
-  if (authLoading || settingsLoading) {
+  if (settingsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
       </div>
     );
   }
-
-  if (!user) return null;
 
   const handleSaveGlobalSettings = async () => {
     await updateSettings({

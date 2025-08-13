@@ -1,1 +1,16 @@
 project_id = "ykodpjvlwdwxgcmtsmtu"
+
+[functions.fetch-google-reviews]
+verify_jwt = false
+
+[functions.generate-ai-reply]
+verify_jwt = false
+
+[functions.send-reply]
+verify_jwt = false
+
+[functions.connect-google-locations]
+verify_jwt = false
+
+[functions.auto-review-cron]
+verify_jwt = false
