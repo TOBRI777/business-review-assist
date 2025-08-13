@@ -1,7 +1,6 @@
 import { Header } from "@/components/layout/Header";
 import { HeroSection } from "@/components/ui/hero-section";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import { ReviewCard } from "@/components/dashboard/ReviewCard";
 import { Button } from "@/components/ui/button";
 import { 
   MessageSquare, 
@@ -9,8 +8,7 @@ import {
   Users, 
   Star,
   Building2,
-  Settings,
-  Plus
+  Settings
 } from "lucide-react";
 
 const Index = () => {
@@ -45,36 +43,6 @@ const Index = () => {
     }
   ];
 
-  const sampleReviews = [
-    {
-      id: "1",
-      author: "Marie Dubois",
-      rating: 5,
-      text: "Excellent service ! L'équipe était très professionnelle et à l'écoute. Je recommande vivement pour toute prestation de qualité.",
-      createdAt: "2024-01-15T10:30:00Z",
-      locationName: "Paris Centre",
-      hasReply: false,
-      replyStatus: "draft" as const
-    },
-    {
-      id: "2", 
-      author: "Jean Martin",
-      rating: 2,
-      text: "Très déçu de ma visite. L'attente était longue et le service client peu aimable. J'espère que vous améliorerez cela.",
-      createdAt: "2024-01-14T15:45:00Z",
-      locationName: "Lyon Part-Dieu",
-      hasReply: false
-    },
-    {
-      id: "3",
-      author: "Sophie Laurent",
-      rating: 4,
-      text: "Globalement satisfaite, bon rapport qualité-prix. Peut-être quelques améliorations possibles sur l'accueil mais rien de grave.",
-      createdAt: "2024-01-13T09:15:00Z",
-      locationName: "Marseille Vieux-Port",
-      hasReply: true
-    }
-  ];
 
   return (
     <div className="min-h-screen">
@@ -113,47 +81,15 @@ const Index = () => {
               ))}
             </div>
 
-            {/* Reviews Section */}
-            <div className="space-y-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-2xl font-bold text-text-primary mb-2">
-                    Avis récents
-                  </h3>
-                  <p className="text-text-muted">
-                    Gérez les avis de tous vos établissements
-                  </p>
-                </div>
-                <Button 
-                  variant="glass" 
-                  className="flex items-center gap-2"
-                  onClick={() => window.location.href = '/auth'}
-                >
-                  <Plus className="w-4 h-4" />
-                  Connecter un établissement
-                </Button>
-              </div>
-
-              <div className="grid gap-6">
-                {sampleReviews.map((review, index) => (
-                  <ReviewCard
-                    key={review.id}
-                    review={review}
-                    onGenerateReply={(id) => console.log("Generate reply for:", id)}
-                    onApproveReply={(id) => console.log("Approve reply for:", id)}
-                  />
-                ))}
-              </div>
-
-              <div className="text-center">
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  onClick={() => window.location.href = '/dashboard'}
-                >
-                  Voir tous les avis
-                </Button>
-              </div>
+            {/* CTA Section */}
+            <div className="text-center">
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => window.location.href = '/dashboard'}
+              >
+                Accéder au tableau de bord
+              </Button>
             </div>
           </div>
         </section>

@@ -2,14 +2,17 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocations } from '@/hooks/useLocations';
+import { useReviews } from '@/hooks/useReviews';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatsCard } from '@/components/dashboard/StatsCard';
-import { Building2, Settings, MessageSquare, Clock, CheckCircle } from 'lucide-react';
+import { ReviewCard } from '@/components/dashboard/ReviewCard';
+import { Building2, Settings, MessageSquare, Clock, CheckCircle, Star } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { locations, loading: locationsLoading } = useLocations();
+  const { reviews, loading: reviewsLoading, approveReply, rejectReply } = useReviews();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,7 +21,7 @@ const Dashboard = () => {
     }
   }, [user, authLoading, navigate]);
 
-  if (authLoading || locationsLoading) {
+  if (authLoading || locationsLoading || reviewsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -29,8 +32,9 @@ const Dashboard = () => {
   if (!user) return null;
 
   const activeLocations = locations.filter(loc => loc.is_active);
-  const locationsWithApproval = locations.filter(loc => loc.location_settings?.requires_approval);
-  const locationsWithAutoReply = locations.filter(loc => !loc.location_settings?.requires_approval);
+  const pendingReplies = reviews.filter(review => review.reply?.status === 'pending');
+  const approvedReplies = reviews.filter(review => review.reply?.status === 'approved');
+  const totalReviews = reviews.length;
 
   return (
     <div className="min-h-screen bg-gradient-primary">
@@ -57,88 +61,76 @@ const Dashboard = () => {
         {/* Stats Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatsCard
+            title="Avis reçus"
+            value={totalReviews}
+            description="Depuis l'inscription"
+            icon={Star}
+          />
+          <StatsCard
+            title="En attente d'approbation"
+            value={pendingReplies.length}
+            description="Réponses à valider"
+            icon={Clock}
+          />
+          <StatsCard
+            title="Réponses approuvées"
+            value={approvedReplies.length}
+            description="Prêtes à envoyer"
+            icon={CheckCircle}
+          />
+          <StatsCard
             title="Établissements connectés"
             value={activeLocations.length}
             description="Établissements actifs"
             icon={Building2}
           />
-          <StatsCard
-            title="Approbation manuelle"
-            value={locationsWithApproval.length}
-            description="Nécessitent validation"
-            icon={Clock}
-          />
-          <StatsCard
-            title="Réponse automatique"
-            value={locationsWithAutoReply.length}
-            description="Envoi direct"
-            icon={CheckCircle}
-          />
-          <StatsCard
-            title="Avis traités"
-            value="0"
-            description="Ce mois-ci"
-            icon={MessageSquare}
-          />
         </div>
 
-        {/* Locations Overview */}
+        {/* Reviews Overview */}
         <Card className="glass p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold text-text-primary">
-              Vos établissements
+              Avis reçus récemment
             </h2>
-            <Button variant="outline" size="sm">
-              Connecter un établissement
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/dashboard/settings')}
+            >
+              Paramètres
             </Button>
           </div>
 
-          {locations.length === 0 ? (
+          {reviews.length === 0 ? (
             <div className="text-center py-12">
-              <Building2 className="w-16 h-16 text-text-muted mx-auto mb-4" />
+              <MessageSquare className="w-16 h-16 text-text-muted mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-text-primary mb-2">
-                Aucun établissement connecté
+                Aucun avis reçu
               </h3>
               <p className="text-text-muted mb-6">
-                Connectez votre premier établissement Google Business pour commencer
+                Les nouveaux avis de vos établissements apparaîtront ici
               </p>
-              <Button>
-                Connecter un établissement
+              <Button onClick={() => navigate('/dashboard/settings')}>
+                Configurer vos établissements
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
-              {locations.map((location) => (
-                <div 
-                  key={location.id}
-                  className="flex items-center justify-between p-4 border border-primary/10 rounded-lg hover:border-primary/20 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-text-primary">{location.name}</h3>
-                      {location.address && (
-                        <p className="text-sm text-text-muted">{location.address}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-text-primary">
-                        {location.location_settings?.requires_approval ? 'Approbation manuelle' : 'Réponse automatique'}
-                      </p>
-                      <p className="text-xs text-text-muted">
-                        {location.is_active ? 'Actif' : 'Inactif'}
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Gérer
-                    </Button>
-                  </div>
-                </div>
+              {reviews.slice(0, 10).map((review) => (
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  onApproveReply={approveReply}
+                  onRejectReply={rejectReply}
+                />
               ))}
+              {reviews.length > 10 && (
+                <div className="text-center pt-4">
+                  <Button variant="outline">
+                    Voir tous les avis ({reviews.length})
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </Card>

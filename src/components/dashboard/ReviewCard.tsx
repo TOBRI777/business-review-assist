@@ -1,34 +1,51 @@
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Star, MessageSquare, Clock, ExternalLink } from "lucide-react";
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Star, User, MapPin, Clock, CheckCircle, XCircle, Send } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface ReviewCardProps {
   review: {
     id: string;
-    author: string;
+    author_name: string;
+    author_photo_url?: string;
     rating: number;
-    text: string;
-    createdAt: string;
-    locationName: string;
-    hasReply: boolean;
-    replyStatus?: "draft" | "sent" | "pending";
+    review_text?: string;
+    review_date: string;
+    location?: {
+      name: string;
+    };
+    reply?: {
+      id: string;
+      generated_reply: string;
+      status: 'pending' | 'approved' | 'rejected' | 'sent';
+      approved_at?: string;
+      sent_at?: string;
+    };
   };
-  onGenerateReply?: (reviewId: string) => void;
-  onApproveReply?: (reviewId: string) => void;
+  onApproveReply?: (replyId: string) => void;
+  onRejectReply?: (replyId: string) => void;
 }
 
-export const ReviewCard = ({ review, onGenerateReply, onApproveReply }: ReviewCardProps) => {
-  const getStatusBadge = () => {
-    if (review.hasReply) {
-      return <Badge className="bg-success/10 text-success border-success/20">Répondu</Badge>;
-    }
-    if (review.replyStatus === "draft") {
-      return <Badge className="bg-warning/10 text-warning border-warning/20">Brouillon</Badge>;
-    }
-    if (review.replyStatus === "pending") {
-      return <Badge className="bg-primary/10 text-primary border-primary/20">En attente</Badge>;
-    }
-    return <Badge variant="outline" className="border-destructive/20 text-destructive">À répondre</Badge>;
+export const ReviewCard = ({ review, onApproveReply, onRejectReply }: ReviewCardProps) => {
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { label: 'En attente', variant: 'secondary' as const, icon: Clock },
+      approved: { label: 'Approuvée', variant: 'default' as const, icon: CheckCircle },
+      rejected: { label: 'Rejetée', variant: 'destructive' as const, icon: XCircle },
+      sent: { label: 'Envoyée', variant: 'default' as const, icon: Send },
+    };
+    
+    const config = statusConfig[status] || statusConfig.pending;
+    const IconComponent = config.icon;
+    
+    return (
+      <Badge variant={config.variant} className="flex items-center gap-1">
+        <IconComponent className="w-3 h-3" />
+        {config.label}
+      </Badge>
+    );
   };
 
   const renderStars = (rating: number) => {
@@ -36,80 +53,99 @@ export const ReviewCard = ({ review, onGenerateReply, onApproveReply }: ReviewCa
       <Star
         key={i}
         className={`w-4 h-4 ${
-          i < rating 
-            ? "fill-yellow-400 text-yellow-400" 
-            : "text-text-subtle"
+          i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
         }`}
       />
     ));
   };
 
   return (
-    <div className="glass p-6 rounded-2xl border border-primary/10 hover:border-primary/20 transition-all duration-300 space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="font-semibold text-text-primary">{review.author}</h3>
-            {getStatusBadge()}
-          </div>
-          <div className="flex items-center gap-2 text-text-muted text-sm">
-            <div className="flex">{renderStars(review.rating)}</div>
-            <span>•</span>
-            <span>{review.locationName}</span>
-            <span>•</span>
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span>{new Date(review.createdAt).toLocaleDateString('fr-FR')}</span>
+    <Card className="glass p-6">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {review.author_photo_url ? (
+            <img
+              src={review.author_photo_url}
+              alt={review.author_name}
+              className="w-10 h-10 rounded-full"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+              <User className="w-5 h-5" />
+            </div>
+          )}
+          <div>
+            <h3 className="font-semibold text-text-primary">{review.author_name}</h3>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-1">
+                {renderStars(review.rating)}
+              </div>
+              <span className="text-sm text-text-muted">
+                {format(new Date(review.review_date), 'dd MMM yyyy', { locale: fr })}
+              </span>
             </div>
           </div>
         </div>
-        <Button variant="ghost" size="icon" className="flex-shrink-0">
-          <ExternalLink className="w-4 h-4" />
-        </Button>
+        {review.reply && getStatusBadge(review.reply.status)}
       </div>
 
-      {/* Review Text */}
-      <div className="p-4 bg-surface-secondary rounded-xl">
-        <p className="text-text-primary leading-relaxed">
-          {review.text}
+      {review.location && (
+        <div className="flex items-center gap-2 mb-3">
+          <MapPin className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm text-text-muted">{review.location.name}</span>
+        </div>
+      )}
+
+      {review.review_text && (
+        <p className="text-text-primary mb-4 leading-relaxed">
+          {review.review_text}
         </p>
-      </div>
+      )}
 
-      {/* Actions */}
-      <div className="flex items-center gap-3 pt-2">
-        {!review.hasReply && !review.replyStatus && (
-          <Button 
-            size="sm" 
-            onClick={() => onGenerateReply?.(review.id)}
-            className="flex items-center gap-2"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Générer réponse
-          </Button>
-        )}
-        
-        {review.replyStatus === "draft" && (
-          <Button 
-            size="sm" 
-            variant="accent"
-            onClick={() => onApproveReply?.(review.id)}
-            className="flex items-center gap-2"
-          >
-            Approuver & Envoyer
-          </Button>
-        )}
-        
-        {review.replyStatus === "pending" && (
-          <Button size="sm" variant="outline" disabled>
-            Envoi en cours...
-          </Button>
-        )}
-        
-        <Button variant="ghost" size="sm">
-          Voir les détails
-        </Button>
-      </div>
-    </div>
+      {review.reply && (
+        <div className="border-t border-border pt-4 mt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-medium text-text-primary">Réponse générée :</span>
+          </div>
+          <p className="text-sm text-text-muted bg-muted/50 p-3 rounded-lg mb-3">
+            {review.reply.generated_reply}
+          </p>
+
+          {review.reply.status === 'pending' && (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => onApproveReply?.(review.reply!.id)}
+                className="flex items-center gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Approuver & Envoyer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onRejectReply?.(review.reply!.id)}
+                className="flex items-center gap-2"
+              >
+                <XCircle className="w-4 h-4" />
+                Rejeter
+              </Button>
+            </div>
+          )}
+
+          {review.reply.status === 'approved' && review.reply.approved_at && (
+            <p className="text-xs text-text-muted">
+              Approuvée le {format(new Date(review.reply.approved_at), 'dd MMM yyyy à HH:mm', { locale: fr })}
+            </p>
+          )}
+
+          {review.reply.status === 'sent' && review.reply.sent_at && (
+            <p className="text-xs text-text-muted">
+              Envoyée le {format(new Date(review.reply.sent_at), 'dd MMM yyyy à HH:mm', { locale: fr })}
+            </p>
+          )}
+        </div>
+      )}
+    </Card>
   );
 };
