@@ -215,6 +215,17 @@ export default function Auth() {
             }
           </button>
         </div>
+
+        {/* Access without authentication for testing */}
+        <div className="mt-6 text-center">
+          <Button
+            onClick={() => navigate('/dashboard')}
+            variant="outline"
+            className="w-full"
+          >
+            Accéder au dashboard (test sans auth)
+          </Button>
+        </div>
       </Card>
     </div>
   );
