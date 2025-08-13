@@ -33,11 +33,12 @@ export const HeroSection = () => {
           
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" className="text-lg px-8 py-4 glow animate-glow-pulse">
+            <Button 
+              size="lg" 
+              className="text-lg px-8 py-4 glow animate-glow-pulse"
+              onClick={() => window.location.href = '/auth/google'}
+            >
               Connecter Google Business
-            </Button>
-            <Button variant="outline" size="lg" className="text-lg px-8 py-4 glass border-primary/20">
-              Voir la démo
             </Button>
           </div>
           

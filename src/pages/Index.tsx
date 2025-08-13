@@ -124,7 +124,11 @@ const Index = () => {
                     Gérez les avis de tous vos établissements
                   </p>
                 </div>
-                <Button variant="glass" className="flex items-center gap-2">
+                <Button 
+                  variant="glass" 
+                  className="flex items-center gap-2"
+                  onClick={() => window.location.href = '/auth/google'}
+                >
                   <Plus className="w-4 h-4" />
                   Connecter un établissement
                 </Button>
@@ -142,7 +146,11 @@ const Index = () => {
               </div>
 
               <div className="text-center">
-                <Button variant="outline" size="lg">
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  onClick={() => window.location.href = '/dashboard'}
+                >
                   Voir tous les avis
                 </Button>
               </div>
