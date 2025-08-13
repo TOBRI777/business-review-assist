@@ -127,7 +127,7 @@ const Index = () => {
                 <Button 
                   variant="glass" 
                   className="flex items-center gap-2"
-                  onClick={() => window.location.href = '/auth/google'}
+                  onClick={() => window.location.href = '/auth'}
                 >
                   <Plus className="w-4 h-4" />
                   Connecter un établissement

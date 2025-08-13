@@ -36,7 +36,7 @@ export const HeroSection = () => {
             <Button 
               size="lg" 
               className="text-lg px-8 py-4 glow animate-glow-pulse"
-              onClick={() => window.location.href = '/auth/google'}
+              onClick={() => window.location.href = '/auth'}
             >
               Connecter Google Business
             </Button>
