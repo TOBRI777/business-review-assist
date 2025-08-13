@@ -4,6 +4,7 @@ import { useReviews } from '@/hooks/useReviews';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StatsCard } from '@/components/dashboard/StatsCard';
+import { AdminControls } from '@/components/dashboard/AdminControls';
 import { ReviewCard } from '@/components/dashboard/ReviewCard';
 import { Building2, Settings, MessageSquare, Clock, CheckCircle, Star } from 'lucide-react';
 
@@ -75,6 +76,11 @@ const Dashboard = () => {
             description="Établissements actifs"
             icon={Building2}
           />
+        </div>
+
+        {/* Admin Controls */}
+        <div className="mb-8">
+          <AdminControls />
         </div>
 
         {/* Reviews Overview */}
