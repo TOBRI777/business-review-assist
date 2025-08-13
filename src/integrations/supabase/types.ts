@@ -207,7 +207,12 @@ export type Database = {
         Row: {
           created_at: string
           global_tone: string | null
-          google_api_key_encrypted: string | null
+          google_connected_at: string | null
+          google_connected_email: string | null
+          google_oauth_access_token_encrypted: string | null
+          google_oauth_refresh_token_encrypted: string | null
+          google_oauth_scope: string | null
+          google_oauth_token_expiry: string | null
           id: string
           openai_api_key_encrypted: string | null
           updated_at: string
@@ -216,7 +221,12 @@ export type Database = {
         Insert: {
           created_at?: string
           global_tone?: string | null
-          google_api_key_encrypted?: string | null
+          google_connected_at?: string | null
+          google_connected_email?: string | null
+          google_oauth_access_token_encrypted?: string | null
+          google_oauth_refresh_token_encrypted?: string | null
+          google_oauth_scope?: string | null
+          google_oauth_token_expiry?: string | null
           id?: string
           openai_api_key_encrypted?: string | null
           updated_at?: string
@@ -225,7 +235,12 @@ export type Database = {
         Update: {
           created_at?: string
           global_tone?: string | null
-          google_api_key_encrypted?: string | null
+          google_connected_at?: string | null
+          google_connected_email?: string | null
+          google_oauth_access_token_encrypted?: string | null
+          google_oauth_refresh_token_encrypted?: string | null
+          google_oauth_scope?: string | null
+          google_oauth_token_expiry?: string | null
           id?: string
           openai_api_key_encrypted?: string | null
           updated_at?: string

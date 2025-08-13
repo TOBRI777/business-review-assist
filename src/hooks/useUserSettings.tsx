@@ -5,8 +5,13 @@ import { useToast } from '@/hooks/use-toast';
 interface UserSettings {
   id: string;
   global_tone: string;
-  google_api_key_encrypted?: string;
   openai_api_key_encrypted?: string;
+  google_oauth_access_token_encrypted?: string;
+  google_oauth_refresh_token_encrypted?: string;
+  google_oauth_token_expiry?: string;
+  google_oauth_scope?: string;
+  google_connected_email?: string;
+  google_connected_at?: string;
 }
 
 export const useUserSettings = () => {

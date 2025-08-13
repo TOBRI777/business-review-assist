@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useLocations } from '@/hooks/useLocations';
+import { useGoogleOAuth } from '@/hooks/useGoogleOAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,17 +11,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Key, MessageSquare, Building2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Key, MessageSquare, Building2, Eye, EyeOff, Link, CheckCircle, XCircle } from 'lucide-react';
 
 const DashboardSettings = () => {
   const { settings, loading: settingsLoading, updateSettings } = useUserSettings();
   const { locations, updateLocationSettings } = useLocations();
+  const { initiateGoogleOAuth, disconnectGoogle, loading: oauthLoading } = useGoogleOAuth();
   const navigate = useNavigate();
 
   const [globalTone, setGlobalTone] = useState('');
-  const [googleApiKey, setGoogleApiKey] = useState('');
   const [openaiApiKey, setOpenaiApiKey] = useState('');
-  const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
 
   useEffect(() => {
@@ -43,20 +43,11 @@ const DashboardSettings = () => {
     });
   };
 
-  const handleSaveApiKeys = async () => {
-    const updates: any = {};
-    
-    if (googleApiKey.trim()) {
-      updates.google_api_key_encrypted = googleApiKey; // Will be encrypted via Edge Function later
-    }
-    
+  const handleSaveOpenaiApiKey = async () => {
     if (openaiApiKey.trim()) {
-      updates.openai_api_key_encrypted = openaiApiKey; // Will be encrypted via Edge Function later
-    }
-
-    if (Object.keys(updates).length > 0) {
-      await updateSettings(updates);
-      setGoogleApiKey('');
+      await updateSettings({
+        openai_api_key_encrypted: openaiApiKey, // Will be encrypted via Edge Function later
+      });
       setOpenaiApiKey('');
     }
   };
@@ -86,42 +77,64 @@ const DashboardSettings = () => {
         </div>
 
         <div className="space-y-8">
-          {/* API Keys Section */}
+          {/* Google OAuth Section */}
+          <Card className="glass p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <Link className="w-6 h-6 text-primary" />
+              <h2 className="text-2xl font-semibold text-text-primary">Connexion Google Business</h2>
+            </div>
+
+            <div className="space-y-4">
+              {/* Google Connection Status */}
+              <div className="flex items-center justify-between p-4 border border-primary/10 rounded-lg">
+                <div className="flex items-center gap-3">
+                  {settings?.google_connected_email ? (
+                    <CheckCircle className="w-5 h-5 text-success" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-text-muted" />
+                  )}
+                  <div>
+                    <p className="font-medium text-text-primary">
+                      {settings?.google_connected_email ? 'Connecté' : 'Non connecté'}
+                    </p>
+                    {settings?.google_connected_email && (
+                      <p className="text-sm text-text-muted">{settings.google_connected_email}</p>
+                    )}
+                  </div>
+                </div>
+                
+                {settings?.google_connected_email ? (
+                  <Button 
+                    variant="outline" 
+                    onClick={disconnectGoogle}
+                    disabled={oauthLoading}
+                  >
+                    Déconnecter
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={initiateGoogleOAuth}
+                    disabled={oauthLoading}
+                  >
+                    Connecter Google
+                  </Button>
+                )}
+              </div>
+              
+              <p className="text-sm text-text-muted">
+                Connectez votre compte Google pour accéder à vos établissements Google Business via OAuth (recommandé)
+              </p>
+            </div>
+          </Card>
+
+          {/* OpenAI API Key Section */}
           <Card className="glass p-6">
             <div className="flex items-center gap-3 mb-6">
               <Key className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-semibold text-text-primary">Clés API</h2>
+              <h2 className="text-2xl font-semibold text-text-primary">Clé API OpenAI (BYOK)</h2>
             </div>
 
-            <div className="space-y-6">
-              {/* Google API Key */}
-              <div className="space-y-2">
-                <Label htmlFor="google-api-key">Clé API Google Business</Label>
-                <div className="relative">
-                  <Input
-                    id="google-api-key"
-                    type={showGoogleKey ? "text" : "password"}
-                    value={googleApiKey}
-                    onChange={(e) => setGoogleApiKey(e.target.value)}
-                    placeholder={settings?.google_api_key_encrypted ? "••••••••••••••••" : "Entrez votre clé API Google"}
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-auto p-1"
-                    onClick={() => setShowGoogleKey(!showGoogleKey)}
-                  >
-                    {showGoogleKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-                <p className="text-sm text-text-muted">
-                  Nécessaire pour accéder à vos établissements Google Business
-                </p>
-              </div>
-
-              {/* OpenAI API Key */}
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="openai-api-key">Clé API OpenAI</Label>
                 <div className="relative">
@@ -144,12 +157,12 @@ const DashboardSettings = () => {
                   </Button>
                 </div>
                 <p className="text-sm text-text-muted">
-                  Utilisée pour générer les réponses automatiques aux avis
+                  Utilisée pour générer les réponses automatiques aux avis (Bring Your Own Key)
                 </p>
               </div>
 
-              <Button onClick={handleSaveApiKeys} className="w-full">
-                Sauvegarder les clés API
+              <Button onClick={handleSaveOpenaiApiKey} className="w-full">
+                Sauvegarder la clé OpenAI
               </Button>
             </div>
           </Card>
