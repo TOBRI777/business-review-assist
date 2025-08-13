@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { AdminControls } from '@/components/dashboard/AdminControls';
 import { ReviewCard } from '@/components/dashboard/ReviewCard';
+import { GoogleBusinessCard } from '@/components/dashboard/GoogleBusinessCard';
 import { Building2, Settings, MessageSquare, Clock, CheckCircle, Star } from 'lucide-react';
 
 const Dashboard = () => {
@@ -76,6 +77,11 @@ const Dashboard = () => {
             description="Établissements actifs"
             icon={Building2}
           />
+        </div>
+
+        {/* Google Business Management */}
+        <div className="mb-8">
+          <GoogleBusinessCard />
         </div>
 
         {/* Admin Controls */}
