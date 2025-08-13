@@ -14,7 +14,134 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      location_settings: {
+        Row: {
+          created_at: string
+          custom_tone: string | null
+          id: string
+          location_id: string
+          requires_approval: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custom_tone?: string | null
+          id?: string
+          location_id: string
+          requires_approval?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custom_tone?: string | null
+          id?: string
+          location_id?: string
+          requires_approval?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_settings_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          address: string | null
+          created_at: string
+          google_location_id: string
+          id: string
+          is_active: boolean | null
+          name: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          google_location_id: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          google_location_id?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          global_tone: string | null
+          google_api_key_encrypted: string | null
+          id: string
+          openai_api_key_encrypted: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          global_tone?: string | null
+          google_api_key_encrypted?: string | null
+          id?: string
+          openai_api_key_encrypted?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          global_tone?: string | null
+          google_api_key_encrypted?: string | null
+          id?: string
+          openai_api_key_encrypted?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
