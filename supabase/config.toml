@@ -2,6 +2,13 @@ project_id = "ykodpjvlwdwxgcmtsmtu"
 
 [functions.fetch-google-reviews]
 verify_jwt = false
+[functions.fetch-google-reviews.schedule]
+cron = "0 */2 * * *"      # toutes les 2h
+
+[functions.auto-review-cron]
+verify_jwt = false
+[functions.auto-review-cron.schedule]
+cron = "5 */2 * * *"      # +5 min
 
 [functions.generate-ai-reply]
 verify_jwt = false
@@ -10,9 +17,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.connect-google-locations]
-verify_jwt = false
-
-[functions.auto-review-cron]
 verify_jwt = false
 
 [functions.google-oauth-initiate]
