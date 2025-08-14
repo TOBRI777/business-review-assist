@@ -51,9 +51,11 @@ export type Database = {
       }
       locations: {
         Row: {
+          account_id: string | null
           address: string | null
           created_at: string
           google_location_id: string
+          google_location_name: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -62,9 +64,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           address?: string | null
           created_at?: string
           google_location_id: string
+          google_location_name?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -73,9 +77,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           address?: string | null
           created_at?: string
           google_location_id?: string
+          google_location_name?: string | null
           id?: string
           is_active?: boolean | null
           name?: string

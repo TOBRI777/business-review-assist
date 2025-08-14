@@ -126,8 +126,9 @@ serve(async (req) => {
 
       // Step 3: Store each location in database
       for (const location of locations) {
-        const locationName = location.name; // format: accounts/123/locations/456
-        const googleLocationId = locationName.split('/').pop(); // Extract location ID
+        const locationName = location.name; // "accounts/{acc}/locations/{loc}"
+        const locationId = locationName.split('/').pop()!;
+        const accountId = locationName.split('/')[1];
         
         const address = location.storefrontAddress ? 
           `${location.storefrontAddress.addressLines?.join(', ') || ''} ${location.storefrontAddress.locality || ''} ${location.storefrontAddress.postalCode || ''}`.trim() : 
@@ -138,7 +139,9 @@ serve(async (req) => {
           .from('locations')
           .upsert({
             user_id: userId,
-            google_location_id: googleLocationId,
+            google_location_id: locationId,
+            google_location_name: locationName,
+            account_id: accountId,
             name: location.title || 'Unknown Location',
             address: address,
             phone: location.primaryPhone || null,
@@ -148,10 +151,10 @@ serve(async (req) => {
           });
 
         if (locationError) {
-          console.error(`Error storing location ${googleLocationId}:`, locationError);
+          console.error(`Error storing location ${locationId}:`, locationError);
         } else {
           connectedLocations++;
-          console.log(`Stored location: ${location.title} (${googleLocationId})`);
+          console.log(`Stored location: ${location.title} (${locationId})`);
         }
       }
     }
