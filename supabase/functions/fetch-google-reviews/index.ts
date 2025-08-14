@@ -1,6 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,29 +12,80 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get user settings to retrieve Google API key
-    const { data: settings, error: settingsError } = await supabaseClient
-      .from('user_settings')
-      .select('google_api_key_encrypted')
-      .single();
-
-    if (settingsError) {
-      throw new Error('Failed to fetch user settings');
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header');
     }
 
-    if (!settings?.google_api_key_encrypted) {
-      throw new Error('Google API key not configured');
+    // Get user from auth token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !userData.user) {
+      throw new Error('Invalid auth token');
+    }
+
+    const userId = userData.user.id;
+
+    // Get user's Google OAuth tokens
+    const { data: settings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('google_oauth_access_token_encrypted, google_oauth_refresh_token_encrypted, google_oauth_token_expiry')
+      .eq('user_id', userId)
+      .single();
+
+    if (settingsError || !settings?.google_oauth_access_token_encrypted) {
+      throw new Error('Google OAuth not configured for this user');
+    }
+
+    // Check if token needs refresh
+    let accessToken = settings.google_oauth_access_token_encrypted;
+    const tokenExpiry = new Date(settings.google_oauth_token_expiry);
+    const now = new Date();
+
+    if (now >= tokenExpiry && settings.google_oauth_refresh_token_encrypted) {
+      // Refresh the token
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+          refresh_token: settings.google_oauth_refresh_token_encrypted,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (refreshResponse.ok) {
+        const tokens = await refreshResponse.json();
+        accessToken = tokens.access_token;
+        
+        // Update tokens in database
+        const newExpiry = new Date();
+        newExpiry.setSeconds(newExpiry.getSeconds() + tokens.expires_in);
+        
+        await supabase
+          .from('user_settings')
+          .update({
+            google_oauth_access_token_encrypted: accessToken,
+            google_oauth_token_expiry: newExpiry.toISOString(),
+          })
+          .eq('user_id', userId);
+      }
     }
 
     // Get user locations
-    const { data: locations, error: locationsError } = await supabaseClient
+    const { data: locations, error: locationsError } = await supabase
       .from('locations')
       .select('*')
+      .eq('user_id', userId)
       .eq('is_active', true);
 
     if (locationsError) {
@@ -46,14 +96,14 @@ serve(async (req) => {
 
     // Fetch reviews for each location
     for (const location of locations || []) {
-      const googlePlaceId = location.google_location_id;
+      const googleLocationId = location.google_location_id;
       
-      // Google My Business API call to fetch reviews
+      // Google My Business API call to fetch reviews for this specific location
       const reviewsResponse = await fetch(
-        `https://mybusiness.googleapis.com/v4/accounts/*/locations/${googlePlaceId}/reviews`,
+        `https://mybusiness.googleapis.com/v4/accounts/-/locations/${googleLocationId}/reviews`,
         {
           headers: {
-            'Authorization': `Bearer ${settings.google_api_key_encrypted}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         }
@@ -69,7 +119,7 @@ serve(async (req) => {
       // Process and store new reviews
       for (const review of reviewsData.reviews || []) {
         // Check if review already exists
-        const { data: existingReview } = await supabaseClient
+        const { data: existingReview } = await supabase
           .from('reviews')
           .select('id')
           .eq('google_review_id', review.reviewId)
@@ -77,7 +127,7 @@ serve(async (req) => {
 
         if (!existingReview) {
           // Insert new review
-          const { error: insertError } = await supabaseClient
+          const { error: insertError } = await supabase
             .from('reviews')
             .insert({
               google_review_id: review.reviewId,

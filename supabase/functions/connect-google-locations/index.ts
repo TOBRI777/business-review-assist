@@ -1,6 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,119 +12,162 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get user settings for Google API key
-    const { data: settings, error: settingsError } = await supabaseClient
-      .from('user_settings')
-      .select('google_api_key_encrypted')
-      .single();
-
-    if (settingsError || !settings?.google_api_key_encrypted) {
-      throw new Error('Google API key not configured');
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header');
     }
 
-    // First, get accounts
-    const accountsResponse = await fetch(
-      'https://mybusiness.googleapis.com/v4/accounts',
-      {
+    // Get user from auth token
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !userData.user) {
+      throw new Error('Invalid auth token');
+    }
+
+    const userId = userData.user.id;
+
+    // Get user's Google OAuth tokens
+    const { data: settings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('google_oauth_access_token_encrypted, google_oauth_refresh_token_encrypted, google_oauth_token_expiry')
+      .eq('user_id', userId)
+      .single();
+
+    if (settingsError || !settings?.google_oauth_access_token_encrypted) {
+      throw new Error('Google OAuth not configured for this user');
+    }
+
+    // Check if token needs refresh
+    let accessToken = settings.google_oauth_access_token_encrypted;
+    const tokenExpiry = new Date(settings.google_oauth_token_expiry);
+    const now = new Date();
+
+    if (now >= tokenExpiry && settings.google_oauth_refresh_token_encrypted) {
+      // Refresh the token
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${settings.google_api_key_encrypted}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+          refresh_token: settings.google_oauth_refresh_token_encrypted,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (refreshResponse.ok) {
+        const tokens = await refreshResponse.json();
+        accessToken = tokens.access_token;
+        
+        // Update tokens in database
+        const newExpiry = new Date();
+        newExpiry.setSeconds(newExpiry.getSeconds() + tokens.expires_in);
+        
+        await supabase
+          .from('user_settings')
+          .update({
+            google_oauth_access_token_encrypted: accessToken,
+            google_oauth_token_expiry: newExpiry.toISOString(),
+          })
+          .eq('user_id', userId);
       }
-    );
+    }
+
+    let connectedLocations = 0;
+
+    // Step 1: Get all accessible accounts
+    const accountsResponse = await fetch('https://mybusiness.googleapis.com/v4/accounts', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (!accountsResponse.ok) {
-      throw new Error('Failed to fetch Google My Business accounts');
+      throw new Error(`Failed to fetch accounts: ${accountsResponse.status}`);
     }
 
     const accountsData = await accountsResponse.json();
-    
-    if (!accountsData.accounts || accountsData.accounts.length === 0) {
-      throw new Error('No Google My Business accounts found');
-    }
+    const accounts = accountsData.accounts || [];
 
-    let allLocations = [];
+    console.log(`Found ${accounts.length} accessible accounts`);
 
-    // Fetch locations for each account
-    for (const account of accountsData.accounts) {
-      const locationsResponse = await fetch(
-        `https://mybusiness.googleapis.com/v4/${account.name}/locations`,
-        {
-          headers: {
-            'Authorization': `Bearer ${settings.google_api_key_encrypted}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+    // Step 2: For each account, get all locations
+    for (const account of accounts) {
+      const accountName = account.name; // format: accounts/123456789
+      
+      const locationsResponse = await fetch(`https://mybusiness.googleapis.com/v4/${accountName}/locations?readMask=name,title,storefrontAddress,primaryPhone&pageSize=100`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (locationsResponse.ok) {
-        const locationsData = await locationsResponse.json();
-        if (locationsData.locations) {
-          allLocations.push(...locationsData.locations);
-        }
+      if (!locationsResponse.ok) {
+        console.warn(`Failed to fetch locations for account ${accountName}: ${locationsResponse.status}`);
+        continue;
       }
-    }
 
-    // Store new locations in database
-    let newLocationsCount = 0;
-    
-    for (const location of allLocations) {
-      // Check if location already exists
-      const { data: existingLocation } = await supabaseClient
-        .from('locations')
-        .select('id')
-        .eq('google_location_id', location.name)
-        .single();
+      const locationsData = await locationsResponse.json();
+      const locations = locationsData.locations || [];
 
-      if (!existingLocation) {
-        // Insert new location
-        const { error: insertError } = await supabaseClient
+      console.log(`Found ${locations.length} locations for account ${accountName}`);
+
+      // Step 3: Store each location in database
+      for (const location of locations) {
+        const locationName = location.name; // format: accounts/123/locations/456
+        const googleLocationId = locationName.split('/').pop(); // Extract location ID
+        
+        const address = location.storefrontAddress ? 
+          `${location.storefrontAddress.addressLines?.join(', ') || ''} ${location.storefrontAddress.locality || ''} ${location.storefrontAddress.postalCode || ''}`.trim() : 
+          null;
+
+        // Upsert location
+        const { error: locationError } = await supabase
           .from('locations')
-          .insert({
-            google_location_id: location.name,
-            name: location.locationName || 'Location',
-            address: location.address ? 
-              `${location.address.addressLines?.join(', ') || ''} ${location.address.locality || ''} ${location.address.postalCode || ''}`.trim() : 
-              null,
-            phone: location.primaryPhone,
+          .upsert({
+            user_id: userId,
+            google_location_id: googleLocationId,
+            name: location.title || 'Unknown Location',
+            address: address,
+            phone: location.primaryPhone || null,
             is_active: true,
+          }, {
+            onConflict: 'user_id,google_location_id'
           });
 
-        if (!insertError) {
-          newLocationsCount++;
+        if (locationError) {
+          console.error(`Error storing location ${googleLocationId}:`, locationError);
+        } else {
+          connectedLocations++;
+          console.log(`Stored location: ${location.title} (${googleLocationId})`);
         }
       }
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        totalLocations: allLocations.length,
-        newLocations: newLocationsCount,
-        locations: allLocations.map(loc => ({
-          id: loc.name,
-          name: loc.locationName,
-          address: loc.address ? 
-            `${loc.address.addressLines?.join(', ') || ''} ${loc.address.locality || ''} ${loc.address.postalCode || ''}`.trim() : 
-            null,
-        }))
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: `Successfully connected ${connectedLocations} locations`,
+      locationsFound: connectedLocations
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
-    console.error('Error in connect-google-locations:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    console.error('Error in connect-google-locations function:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
