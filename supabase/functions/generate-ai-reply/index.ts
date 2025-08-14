@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { open } from '../_utils/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,7 +60,10 @@ serve(async (req) => {
       .eq('user_id', userId)
       .single();
 
-    if (settingsError || !settings?.openai_api_key_encrypted) {
+    const openaiKey = settings?.openai_api_key_encrypted
+      ? await open(JSON.parse(settings.openai_api_key_encrypted))
+      : (Deno.env.get("OPENAI_API_KEY") ?? null);
+    if (!openaiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
@@ -85,7 +89,7 @@ Rédigez une réponse appropriée, personnalisée et professionnelle en françai
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${settings.openai_api_key_encrypted}`,
+        'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

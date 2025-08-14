@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.google-oauth-callback]
 verify_jwt = false
+
+[functions.save-openai-key]
+verify_jwt = false

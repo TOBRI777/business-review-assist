@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { useLocations } from '@/hooks/useLocations';
@@ -45,10 +46,28 @@ const DashboardSettings = () => {
 
   const handleSaveOpenaiApiKey = async () => {
     if (openaiApiKey.trim()) {
-      await updateSettings({
-        openai_api_key_encrypted: openaiApiKey, // Will be encrypted via Edge Function later
-      });
-      setOpenaiApiKey('');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        const response = await fetch('https://ykodpjvlwdwxgcmtsmtu.supabase.co/functions/v1/save-openai-key', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ openaiKey: openaiApiKey }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save OpenAI key');
+        }
+
+        setOpenaiApiKey('');
+        // Trigger a refetch of settings to show the updated state
+        window.location.reload();
+      } catch (error) {
+        console.error('Error saving OpenAI key:', error);
+      }
     }
   };
 
