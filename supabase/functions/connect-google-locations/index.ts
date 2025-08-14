@@ -14,23 +14,22 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
+    const getUserIdFromReq = async (req: Request) => {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data } = await supabase.auth.getUser(token);
+        if (data?.user) return data.user.id;
+      }
+      const dev = Deno.env.get('DEV_USER_ID');
+      if (dev) return dev;
+      throw new Error('No auth and no DEV_USER_ID');
+    };
 
-    // Get user from auth token
-    const token = authHeader.replace('Bearer ', '');
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    
-    if (userError || !userData.user) {
-      throw new Error('Invalid auth token');
-    }
-
-    const userId = userData.user.id;
+    const userId = await getUserIdFromReq(req);
 
     // Get user's Google OAuth tokens
     const { data: settings, error: settingsError } = await supabase

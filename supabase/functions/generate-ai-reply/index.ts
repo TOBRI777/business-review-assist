@@ -15,32 +15,48 @@ serve(async (req) => {
   try {
     const { reviewId } = await req.json();
 
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
+    const getUserIdFromReq = async (req: Request) => {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data } = await supabase.auth.getUser(token);
+        if (data?.user) return data.user.id;
+      }
+      const dev = Deno.env.get('DEV_USER_ID');
+      if (dev) return dev;
+      throw new Error('No auth and no DEV_USER_ID');
+    };
+
+    const userId = await getUserIdFromReq(req);
+
     // Get the review details
-    const { data: review, error: reviewError } = await supabaseClient
+    const { data: review, error: reviewError } = await supabase
       .from('reviews')
       .select(`
         *,
         location:locations(
           name,
+          user_id,
           location_settings(custom_tone, requires_approval)
         )
       `)
       .eq('id', reviewId)
       .single();
 
-    if (reviewError || !review) {
+    if (reviewError || !review || review.location.user_id !== userId) {
       throw new Error('Review not found');
     }
 
     // Get user settings for OpenAI key and global tone
-    const { data: settings, error: settingsError } = await supabaseClient
+    const { data: settings, error: settingsError } = await supabase
       .from('user_settings')
       .select('openai_api_key_encrypted, global_tone')
+      .eq('user_id', userId)
       .single();
 
     if (settingsError || !settings?.openai_api_key_encrypted) {
@@ -95,7 +111,7 @@ Rédigez une réponse appropriée, personnalisée et professionnelle en françai
     const status = requiresApproval ? 'pending' : 'approved';
 
     // Store the generated reply
-    const { data: reply, error: replyError } = await supabaseClient
+    const { data: reply, error: replyError } = await supabase
       .from('review_replies')
       .insert({
         review_id: reviewId,

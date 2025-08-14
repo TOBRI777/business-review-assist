@@ -15,37 +15,52 @@ serve(async (req) => {
   try {
     const { replyId } = await req.json();
 
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
+    const getUserIdFromReq = async (req: Request) => {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data } = await supabase.auth.getUser(token);
+        if (data?.user) return data.user.id;
+      }
+      const dev = Deno.env.get('DEV_USER_ID');
+      if (dev) return dev;
+      throw new Error('No auth and no DEV_USER_ID');
+    };
+
+    const userId = await getUserIdFromReq(req);
+
     // Get the reply and associated review
-    const { data: reply, error: replyError } = await supabaseClient
+    const { data: reply, error: replyError } = await supabase
       .from('review_replies')
       .select(`
         *,
         review:reviews(
           google_review_id,
-          location:locations(google_location_id)
+          location:locations(google_location_id, user_id)
         )
       `)
       .eq('id', replyId)
       .eq('status', 'approved')
       .single();
 
-    if (replyError || !reply) {
+    if (replyError || !reply || reply.review.location.user_id !== userId) {
       throw new Error('Approved reply not found');
     }
 
-    // Get user settings for Google API key
-    const { data: settings, error: settingsError } = await supabaseClient
+    // Get user settings for Google OAuth tokens
+    const { data: settings, error: settingsError } = await supabase
       .from('user_settings')
-      .select('google_api_key_encrypted')
+      .select('google_oauth_access_token_encrypted')
+      .eq('user_id', userId)
       .single();
 
-    if (settingsError || !settings?.google_api_key_encrypted) {
-      throw new Error('Google API key not configured');
+    if (settingsError || !settings?.google_oauth_access_token_encrypted) {
+      throw new Error('Google OAuth not configured');
     }
 
     // Send reply to Google My Business
@@ -54,7 +69,7 @@ serve(async (req) => {
       {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${settings.google_api_key_encrypted}`,
+          'Authorization': `Bearer ${settings.google_oauth_access_token_encrypted}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -68,7 +83,7 @@ serve(async (req) => {
     }
 
     // Update reply status to sent
-    const { error: updateError } = await supabaseClient
+    const { error: updateError } = await supabase
       .from('review_replies')
       .update({
         status: 'sent',
