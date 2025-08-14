@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
+import { open, seal } from '../_utils/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,13 +43,16 @@ serve(async (req) => {
       throw new Error('Google OAuth not configured for this user');
     }
 
-    // Check if token needs refresh
-    let accessToken = settings.google_oauth_access_token_encrypted;
+    // Check if token needs refresh and decrypt tokens
+    let accessToken = settings.google_oauth_access_token_encrypted 
+      ? await open(JSON.parse(settings.google_oauth_access_token_encrypted))
+      : null;
     const tokenExpiry = new Date(settings.google_oauth_token_expiry);
     const now = new Date();
 
     if (now >= tokenExpiry && settings.google_oauth_refresh_token_encrypted) {
-      // Refresh the token
+      // Decrypt refresh token and refresh the access token
+      const refreshToken = await open(JSON.parse(settings.google_oauth_refresh_token_encrypted));
       const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -57,7 +61,7 @@ serve(async (req) => {
         body: new URLSearchParams({
           client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
           client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
-          refresh_token: settings.google_oauth_refresh_token_encrypted,
+          refresh_token: refreshToken,
           grant_type: 'refresh_token',
         }),
       });
@@ -66,14 +70,16 @@ serve(async (req) => {
         const tokens = await refreshResponse.json();
         accessToken = tokens.access_token;
         
-        // Update tokens in database
+        // Update tokens in database with encryption
         const newExpiry = new Date();
         newExpiry.setSeconds(newExpiry.getSeconds() + tokens.expires_in);
+        
+        const encryptedAccessToken = await seal(accessToken);
         
         await supabase
           .from('user_settings')
           .update({
-            google_oauth_access_token_encrypted: accessToken,
+            google_oauth_access_token_encrypted: JSON.stringify(encryptedAccessToken),
             google_oauth_token_expiry: newExpiry.toISOString(),
           })
           .eq('user_id', userId);

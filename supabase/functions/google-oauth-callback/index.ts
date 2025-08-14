@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
+import { seal } from '../_utils/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,12 +65,15 @@ serve(async (req) => {
     const expiryDate = new Date();
     expiryDate.setSeconds(expiryDate.getSeconds() + tokens.expires_in);
 
-    // Store tokens in user_settings (encrypted - for production, implement encryption)
+    // Encrypt tokens before storing
+    const at = await seal(tokens.access_token);
+    const rt = tokens.refresh_token ? await seal(tokens.refresh_token) : null;
+
     const { error: updateError } = await supabase
       .from('user_settings')
       .update({
-        google_oauth_access_token_encrypted: tokens.access_token, // TODO: Encrypt in production
-        google_oauth_refresh_token_encrypted: tokens.refresh_token, // TODO: Encrypt in production
+        google_oauth_access_token_encrypted: JSON.stringify(at),
+        google_oauth_refresh_token_encrypted: rt ? JSON.stringify(rt) : null,
         google_oauth_token_expiry: expiryDate.toISOString(),
         google_oauth_scope: tokens.scope,
         google_connected_email: profile.email,

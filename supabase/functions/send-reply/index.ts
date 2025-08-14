@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { open } from '../_utils/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,13 +64,16 @@ serve(async (req) => {
       throw new Error('Google OAuth not configured');
     }
 
+    // Decrypt access token
+    const accessToken = await open(JSON.parse(settings.google_oauth_access_token_encrypted));
+
     // Send reply to Google My Business
     const googleResponse = await fetch(
       `https://mybusiness.googleapis.com/v4/accounts/*/locations/${reply.review.location.google_location_id}/reviews/${reply.review.google_review_id}/reply`,
       {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${settings.google_oauth_access_token_encrypted}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
