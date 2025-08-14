@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { open } from '../_utils/crypto.ts';
+import { open, seal } from '../_utils/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,14 +35,14 @@ serve(async (req) => {
 
     const userId = await getUserIdFromReq(req);
 
-    // Get the reply and associated review
+    // Get the reply and associated review with location
     const { data: reply, error: replyError } = await supabase
       .from('review_replies')
       .select(`
         *,
         review:reviews(
           google_review_id,
-          location:locations(google_location_id, user_id)
+          location:locations(google_location_name, user_id)
         )
       `)
       .eq('id', replyId)
@@ -56,7 +56,7 @@ serve(async (req) => {
     // Get user settings for Google OAuth tokens
     const { data: settings, error: settingsError } = await supabase
       .from('user_settings')
-      .select('google_oauth_access_token_encrypted')
+      .select('google_oauth_access_token_encrypted, google_oauth_refresh_token_encrypted, google_oauth_token_expiry')
       .eq('user_id', userId)
       .single();
 
@@ -64,23 +64,59 @@ serve(async (req) => {
       throw new Error('Google OAuth not configured');
     }
 
-    // Decrypt access token
-    const accessToken = await open(JSON.parse(settings.google_oauth_access_token_encrypted));
+    // Decrypt and check if token needs refresh
+    let accessToken = await open(JSON.parse(settings.google_oauth_access_token_encrypted));
+    const tokenExpiry = new Date(settings.google_oauth_token_expiry);
+    const now = new Date();
 
-    // Send reply to Google My Business
-    const googleResponse = await fetch(
-      `https://mybusiness.googleapis.com/v4/accounts/*/locations/${reply.review.location.google_location_id}/reviews/${reply.review.google_review_id}/reply`,
-      {
-        method: 'PUT',
+    if (now >= tokenExpiry && settings.google_oauth_refresh_token_encrypted) {
+      // Decrypt refresh token and refresh the access token
+      const refreshToken = await open(JSON.parse(settings.google_oauth_refresh_token_encrypted));
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-          comment: reply.generated_reply
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') ?? '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') ?? '',
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token',
         }),
+      });
+
+      if (refreshResponse.ok) {
+        const tokens = await refreshResponse.json();
+        accessToken = tokens.access_token;
+        
+        // Update tokens in database with encryption
+        const newExpiry = new Date();
+        newExpiry.setSeconds(newExpiry.getSeconds() + tokens.expires_in);
+        
+        const encryptedAccessToken = await seal(accessToken);
+        
+        await supabase
+          .from('user_settings')
+          .update({
+            google_oauth_access_token_encrypted: JSON.stringify(encryptedAccessToken),
+            google_oauth_token_expiry: newExpiry.toISOString(),
+          })
+          .eq('user_id', userId);
       }
-    );
+    }
+
+    // Send reply to Google My Business using correct endpoint
+    const replyUrl = `https://mybusiness.googleapis.com/v4/${reply.review.location.google_location_name}/reviews/${reply.review.google_review_id}/reply`;
+    const googleResponse = await fetch(replyUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        comment: reply.generated_reply
+      }),
+    });
 
     if (!googleResponse.ok) {
       throw new Error('Failed to send reply to Google');

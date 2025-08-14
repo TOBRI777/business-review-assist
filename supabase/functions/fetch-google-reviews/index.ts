@@ -99,20 +99,16 @@ serve(async (req) => {
 
     let totalNewReviews = 0;
 
-    // Fetch reviews for each location
+    // Fetch reviews for each location using full location name
     for (const location of locations || []) {
-      const googleLocationId = location.google_location_id;
+      const url = `https://mybusiness.googleapis.com/v4/${location.google_location_name}/reviews?pageSize=100`;
       
-      // Google My Business API call to fetch reviews for this specific location
-      const reviewsResponse = await fetch(
-        `https://mybusiness.googleapis.com/v4/accounts/-/locations/${googleLocationId}/reviews`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const reviewsResponse = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!reviewsResponse.ok) {
         console.error(`Failed to fetch reviews for location ${location.id}`);
